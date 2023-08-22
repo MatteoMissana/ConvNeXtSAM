@@ -1,0 +1,10 @@
+path: dataset/new_cholec  # dataset root dir
+train: images/train  # train images
+val: images/val  # val images
+
+# Classes
+names:
+  0: instrument
+
+
+
