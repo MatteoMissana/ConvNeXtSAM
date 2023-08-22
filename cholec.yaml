@@ -1,0 +1,10 @@
+path: dataset/cholec_yolo_clean  # dataset root dir
+train: images/train  # train images
+val: images/val  # val images 
+
+# Classes
+names:
+  0: instrument
+  
+  
+  
