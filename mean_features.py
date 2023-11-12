@@ -5,7 +5,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import os
 import shutil
-from featmap_comparison import save_difs, save_difs_mean
+from utils.featmap_comparison import save_difs, save_difs_mean
 
 def run(
         convsam,
