@@ -25,7 +25,7 @@ from models.common import *
 from models.experimental import *
 from utils.autoanchor import check_anchor_order
 from utils.general import LOGGER, check_version, check_yaml, make_divisible, print_args
-from utils.plots import feature_visualization
+from utils.plots import feature_visualization, feature_visualization_meanmaps
 from utils.torch_utils import (fuse_conv_and_bn, initialize_weights, model_info, profile, scale_img, select_device,
                                time_sync)
 
@@ -108,10 +108,10 @@ class Segment(Detect):
 
 class BaseModel(nn.Module):
     # YOLOv5 base model
-    def forward(self, x, profile=False, visualize=False):
-        return self._forward_once(x, profile, visualize)  # single-scale inference, train
+    def forward(self, x, profile=False, visualize=False, meanfeature=False):
+        return self._forward_once(x, profile, visualize, meanfeature)  # single-scale inference, train
 
-    def _forward_once(self, x, profile=False, visualize=False):
+    def _forward_once(self, x, profile=False, visualize=False, meanfeature=False):
         y, dt = [], []  # outputs
         for m in self.model:
             if m.f != -1:  # if not from previous layer
@@ -120,7 +120,9 @@ class BaseModel(nn.Module):
                 self._profile_one_layer(m, x, dt)
             x = m(x)  # run
             y.append(x if m.i in self.save else None)  # save output
-            if visualize:
+            if visualize and meanfeature:
+                feature_visualization_meanmaps(x, m.type, m.i, save_dir=visualize)
+            elif visualize:
                 feature_visualization(x, m.type, m.i, save_dir=visualize)
         return x
 
@@ -160,6 +162,7 @@ class BaseModel(nn.Module):
             if isinstance(m.anchor_grid, list):
                 m.anchor_grid = list(map(fn, m.anchor_grid))
         return self
+
 
 
 class DetectionModel(BaseModel):
@@ -203,10 +206,10 @@ class DetectionModel(BaseModel):
         self.info()
         LOGGER.info('')
 
-    def forward(self, x, augment=False, profile=False, visualize=False):
+    def forward(self, x, augment=False, profile=False, visualize=False, meanfeature=False):
         if augment:
             return self._forward_augment(x)  # augmented inference, None
-        return self._forward_once(x, profile, visualize)  # single-scale inference, train
+        return self._forward_once(x, profile, visualize, meanfeature)  # single-scale inference, train
 
     def _forward_augment(self, x):
         img_size = x.shape[-2:]  # height, width

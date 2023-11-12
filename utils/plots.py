@@ -194,6 +194,18 @@ def feature_visualization(x, module_type, stage, n=32, save_dir=Path('runs/detec
             np.save(str(f.with_suffix('.npy')), x[0].cpu().numpy())  # npy save
 
 
+def feature_visualization_meanmaps(x, module_type, stage, n=32, save_dir=Path('runs/detect/exp')):
+    """
+    same thing as feature_visualization but only saves the numpy arrays
+    """
+    if 'Detect' not in module_type:
+        batch, channels, height, width = x.shape  # batch, channels, height, width
+        if height > 1 and width > 1:
+            f = save_dir / f"stage{stage}_{module_type.split('.')[-1]}_features.png"  # filename
+            blocks = torch.chunk(x[0].cpu(), channels, dim=0)  # select batch index 0, block by channels
+            np.save(str(f.with_suffix('.npy')), x[0].cpu().numpy())  # npy save
+
+
 def hist2d(x, y, n=100):
     # 2d histogram used in labels.png and evolve.png
     xedges, yedges = np.linspace(x.min(), x.max(), n), np.linspace(y.min(), y.max(), n)
