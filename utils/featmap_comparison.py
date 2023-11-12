@@ -33,7 +33,6 @@ def save_difs(path_dir_sam, path_dir_CneXt, path_save):
     for num in ["26", "30", "34"]:
         print('stage', num)
         if num == dim_ckpt:
-            print('suca')
             for indx,folder_sam in enumerate(folder_sam_list):
                 print('i 1',indx)
 
@@ -168,9 +167,7 @@ def save_difs_mean(path_dir_sam, path_dir_CneXt, path_save):
     for num in ["26", "30", "34"]:
         print('stage', num)
         if num == dim_ckpt:
-            print('suca')
             for indx, folder_sam in enumerate(folder_sam_list):
-                print('i 1', indx)
 
                 '''
                 if indx >= 6:
