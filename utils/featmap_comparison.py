@@ -168,21 +168,11 @@ def save_difs_mean(path_dir_sam, path_dir_CneXt, path_save):
         print('stage', num)
         if num == dim_ckpt:
             for indx, folder_sam in enumerate(folder_sam_list):
-
-                '''
-                if indx >= 6:
-                    #print(indx,dim_ckpt,img_ckpt,map_ckpt)
-                    img_ckpt = folder_sam_list[0]
-                    f = open(ckpt_path, 'w')
-                    f.write(sep.join([dim_ckpt, img_ckpt, map_ckpt]))
-                    f.close()
-                    break
-                '''
-                if folder_sam == img_ckpt:
+                if not (os.path.isfile((os.path.join(path_dir_sam, folder_sam)))) and (folder_sam == img_ckpt):
                     print('folder sam', folder_sam)
                     for indx2, folder_Cnext in enumerate(folder_cnext_list):
                         print('i 2', indx2)
-                        if folder_Cnext == folder_sam and (('.png' or '.jpg')not in folder_sam):
+                        if not (os.path.isfile((os.path.join(path_dir_CneXt, folder_sam)))) and folder_Cnext == folder_sam:
                             print('folder convnext', folder_Cnext)
                             for files_sam in sorted(os.listdir(os.path.join(path_dir_sam, folder_sam))):
                                 if "stage{}".format(num) == files_sam.split('_')[0]:
@@ -245,9 +235,7 @@ def save_difs_mean(path_dir_sam, path_dir_CneXt, path_save):
                                                                     bbox_inches='tight', pad_inches=0.1)
                                                         plt.close()'''
 
-                                                    if not os.path.isfile(os.path.join(path_save, name,
-                                                                                       'dif_{}/mean/mean.png'.format(
-                                                                                               s))):
+                                                    if not os.path.isfile(os.path.join(path_save, name,'dif_{}/mean/mean.png'.format(s))):
                                                         mean = np.mean(dif, axis=0)
                                                         # plt.imsave('dif_s/mean/mean.png',mean)
                                                         fig, ax = plt.subplots()
