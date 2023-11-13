@@ -33,6 +33,8 @@ def run(
         shutil.rmtree(path_dir_CneXt)
         shutil.rmtree(path_dir_sam)
 
+    print('results saved in ')
+    print(path_save)
 
 def parse_opt():
     parser = argparse.ArgumentParser()
