@@ -5,7 +5,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import os
 import shutil
-from utils.featmap_comparison import save_difs, save_difs_mean
+from utils.featcomp import save_difs_mean
 
 def run(
         convsam,
@@ -24,10 +24,7 @@ def run(
     path_dir_CneXt = os.getcwd()+os.path.join(r'\runs\detect', pathconv)
     path_save = os.getcwd()+os.path.join(r'\runs\detect', savedir)
 
-    if savealldiffs:
-        save_difs(path_dir_sam, path_dir_CneXt, path_save)
-    else:
-        save_difs_mean(path_dir_sam, path_dir_CneXt, path_save)
+    save_difs_mean(path_dir_sam, path_dir_CneXt, path_save)
 
     if not visualize:
         shutil.rmtree(path_dir_CneXt)

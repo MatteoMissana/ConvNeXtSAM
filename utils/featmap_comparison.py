@@ -144,8 +144,9 @@ def save_difs_mean(path_dir_sam, path_dir_CneXt, path_save):
     ckpt_path = os.path.join(path_save, 'checkpoint.txt')
 
     print(path_dir_sam)
-    folder_sam_list = sorted(os.listdir(path_dir_sam))
-    folder_cnext_list = sorted(os.listdir(path_dir_CneXt))
+    folder_sam_list = path_dir_sam
+    '''folder_cnext_list = sorted(os.listdir(path_dir_CneXt))'''
+    folder_cnext_list = path_dir_CneXt
     sep = ','
 
     if not os.path.isfile(ckpt_path):
@@ -193,16 +194,38 @@ def save_difs_mean(path_dir_sam, path_dir_CneXt, path_save):
                                             if not os.path.isdir(os.path.join(path_save, name)):
                                                 os.mkdir(os.path.join(path_save, name))
 
-                                            if not os.path.isfile(
-                                                    os.path.join(path_save, name, name + '_convnextsam' + '.png')):
-                                                shutil.copy(os.path.join(path_dir_sam, name + '.png'),
-                                                            os.path.join(path_save, name,
-                                                                         name + '_convnextsam' + '.png'))
+                                            if os.path.isfile(os.path.join(path_dir_sam, name + '.png')) and \
+                                                    os.path.isfile(os.path.join(path_dir_CneXt, name + '.png')):
 
-                                            if not os.path.isfile(
-                                                    os.path.join(path_save, name, name + '_convnext' + '.png')):
-                                                shutil.copy(os.path.join(path_dir_CneXt, name + '.png'),
-                                                            os.path.join(path_save, name, name + '_convnext' + '.png'))
+                                                if not os.path.isfile(
+                                                        os.path.join(path_save, name, name + '_convnextsam' + '.png')):
+                                                    shutil.copy(os.path.join(path_dir_sam, name + '.png'),
+                                                                os.path.join(path_save, name,
+                                                                             name + '_convnextsam' + '.png'))
+
+                                                if not os.path.isfile(
+                                                        os.path.join(path_save, name, name + '_convnext' + '.png')):
+                                                    shutil.copy(os.path.join(path_dir_CneXt, name + '.png'),
+                                                                os.path.join(path_save, name, name + '_convnext' + '.png'))
+
+                                            if os.path.isfile(
+                                                    os.path.join(path_dir_sam, name + '.jpg')) and os.path.isfile(
+                                                    os.path.join(path_dir_CneXt, name + '.jpg')):
+
+                                                if not os.path.isfile(
+                                                        os.path.join(path_save, name,
+                                                                     name + '_convnextsam' + '.jpg')):
+                                                    shutil.copy(os.path.join(path_dir_sam, name + '.jpg'),
+                                                                os.path.join(path_save, name,
+                                                                             name + '_convnextsam' + '.jpg'))
+
+                                                if not os.path.isfile(
+                                                        os.path.join(path_save, name, name + '_convnext' + '.jpg')):
+                                                    shutil.copy(os.path.join(path_dir_CneXt, name + '.jpg'),
+                                                                os.path.join(path_save, name,
+                                                                             name + '_convnext' + '.jpg'))
+
+
 
                                             for i in ('s', 'm', 'l'):
                                                 if not os.path.isdir(os.path.join(path_save, name, 'dif_{}'.format(i))):
