@@ -135,6 +135,8 @@ def save_difs(path_dir_sam, path_dir_CneXt, path_save):
     f = open(ckpt_path, 'w')
     f.write(sep.join([dim_ckpt, img_ckpt, map_ckpt]))
     f.close()
+
+    os.remove(ckpt_path)
     return
 
 def save_difs_mean(path_dir_sam, path_dir_CneXt, path_save):
@@ -294,4 +296,6 @@ def save_difs_mean(path_dir_sam, path_dir_CneXt, path_save):
     f = open(ckpt_path, 'w')
     f.write(sep.join([dim_ckpt, img_ckpt, map_ckpt]))
     f.close()
+
+    os.remove(ckpt_path)
     return
