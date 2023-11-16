@@ -7,7 +7,7 @@ from matplotlib import  pyplot as plt
 #------------------------------     IMPORTANTE    ----------------------------------------------------------------------
 #-----------------------------------------------------------------------------------------------------------------------
 #
-#     i pesi che vuoi usare devono essere nel main branch della tua repo locale
+# i pesi che vuoi usare devono essere nel main branch della tua repo locale ( NON VA AGGIUNTO A GIT PERCHE' PESA TROPPO)
 
 
 
@@ -26,6 +26,12 @@ def draw_bbox(preds, img):
 
 
 model = torch.hub.load('MatteoMissana/ConvNeXtSAM', 'custom', 'ConvNext.pt', trust_repo=True)
+
+
+
+# qui sotto ti metto come salvare il modello per esportarlo ed usarlo dove vuoi
+# torch.save(model, 'your_path/complete_model.pth')
+
 
 # print(model)
 # summary(model, (3, 640, 640))
