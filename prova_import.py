@@ -34,9 +34,18 @@ img = plt.imread('dataset/micro/images/test/image_000002_png.rf.a9ecda8477278f97
 
 out = model(img)  # out è un oggetto Detections dichiarato in common.py righa 1950
 
+# si possono fare un sacco di cose simpatiche con questo oggetto...
+
+# out.save(save_dir='runs/detect/exp') ti salva le immagini con la bbox sopra in save_dir (quello è il default)
+# out.crop(save_dir='runs/detect/exp') ti salva i crop delle sole bbox
+# guarda dove lo dichiara per altri metodi che non ho esplorato...
+
 # out.save()
 pred = out.pred
 # pred == list(tensor(x_up_left, y_up_left, width, height, conf, class); len(pred) == num_imgs; tensor.size() == (n_preds,6)
+
+
+
 
 print(pred)
 
