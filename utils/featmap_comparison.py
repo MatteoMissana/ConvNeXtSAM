@@ -135,6 +135,8 @@ def save_difs(path_dir_sam, path_dir_CneXt, path_save):
     f = open(ckpt_path, 'w')
     f.write(sep.join([dim_ckpt, img_ckpt, map_ckpt]))
     f.close()
+
+    os.remove(ckpt_path)
     return
 
 def save_difs_mean(path_dir_sam, path_dir_CneXt, path_save):
@@ -144,9 +146,9 @@ def save_difs_mean(path_dir_sam, path_dir_CneXt, path_save):
     ckpt_path = os.path.join(path_save, 'checkpoint.txt')
 
     print(path_dir_sam)
-    folder_sam_list = path_dir_sam
+    folder_sam_list = sorted(os.listdir(path_dir_sam))
     '''folder_cnext_list = sorted(os.listdir(path_dir_CneXt))'''
-    folder_cnext_list = path_dir_CneXt
+    folder_cnext_list = sorted(os.listdir(path_dir_CneXt))
     sep = ','
 
     if not os.path.isfile(ckpt_path):
@@ -176,6 +178,7 @@ def save_difs_mean(path_dir_sam, path_dir_CneXt, path_save):
                         if not (os.path.isfile((os.path.join(path_dir_CneXt, folder_sam)))) and folder_Cnext == folder_sam:
                             print('folder convnext', folder_Cnext)
                             for files_sam in sorted(os.listdir(os.path.join(path_dir_sam, folder_sam))):
+                                print('files sam : {}'.format(files_sam))
                                 if "stage{}".format(num) == files_sam.split('_')[0]:
                                     print('sam_file', files_sam)
                                     for files_Cnext in sorted(os.listdir(os.path.join(path_dir_CneXt, folder_Cnext))):
@@ -293,4 +296,6 @@ def save_difs_mean(path_dir_sam, path_dir_CneXt, path_save):
     f = open(ckpt_path, 'w')
     f.write(sep.join([dim_ckpt, img_ckpt, map_ckpt]))
     f.close()
+
+    os.remove(ckpt_path)
     return

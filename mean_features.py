@@ -5,7 +5,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import os
 import shutil
-from utils.featcomp import save_difs_mean, save_difs
+from utils.featmap_comparison import save_difs_mean, save_difs
 
 def run(
         convsam,
@@ -33,8 +33,11 @@ def run(
         shutil.rmtree(path_dir_CneXt)
         shutil.rmtree(path_dir_sam)
 
-    print('results saved in ')
-    print(path_save)
+    folder0 = source.split('/')[-1].split('.')
+    folder = '.'.join(folder0[0:-1])
+
+    print(f'results saved in {path_save}\\{folder}')
+
 
 def parse_opt():
     parser = argparse.ArgumentParser()
