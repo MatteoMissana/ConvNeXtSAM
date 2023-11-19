@@ -108,10 +108,10 @@ class Segment(Detect):
 
 class BaseModel(nn.Module):
     # YOLOv5 base model
-    def forward(self, x, profile=False, visualize=False, meanfeature=False):
-        return self._forward_once(x, profile, visualize, meanfeature)  # single-scale inference, train
+    def forward(self, x, profile=False, visualize=False, meanfeature=False, extract=False, target=0):
+        return self._forward_once(x, profile, visualize, meanfeature, extract, target=target)  # single-scale inference, train
 
-    def _forward_once(self, x, profile=False, visualize=False, meanfeature=False):
+    def _forward_once(self, x, profile=False, visualize=False, meanfeature=False, extract=False, target=0):
         y, dt = [], []  # outputs
         for m in self.model:
             if m.f != -1:  # if not from previous layer
@@ -121,10 +121,16 @@ class BaseModel(nn.Module):
             x = m(x)  # run
             y.append(x if m.i in self.save else None)  # save output
             if visualize and meanfeature:
-                feature_visualization_meanmaps(x, m.type, m.i, save_dir=visualize)
+                feature_visualization_meanmaps(x, m.type, m.i, save_dir=visualize, extract=False)
+            if visualize and extract:
+                if m.i==target:
+                    mappa=feature_visualization_meanmaps(x, m.type, m.i, save_dir=visualize, extract=extract, target=target)
             elif visualize:
-                feature_visualization(x, m.type, m.i, save_dir=visualize)
-        return x
+                feature_visualizFation(x, m.type, m.i, save_dir=visualize)
+        if visualize and extract:
+            return x, mappa
+        else:
+            return x
 
     def _profile_one_layer(self, m, x, dt):
         c = m == self.model[-1]  # is final layer, copy input as inplace fix
@@ -206,10 +212,10 @@ class DetectionModel(BaseModel):
         self.info()
         LOGGER.info('')
 
-    def forward(self, x, augment=False, profile=False, visualize=False, meanfeature=False):
+    def forward(self, x, augment=False, profile=False, visualize=False, meanfeature=False, extract=False, target=0):
         if augment:
             return self._forward_augment(x)  # augmented inference, None
-        return self._forward_once(x, profile, visualize, meanfeature)  # single-scale inference, train
+        return self._forward_once(x, profile, visualize, meanfeature, extract, target=target)  # single-scale inference, train
 
     def _forward_augment(self, x):
         img_size = x.shape[-2:]  # height, width
