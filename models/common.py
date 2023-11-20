@@ -1424,7 +1424,7 @@ class DetectMultiBackend_meanfeature(nn.Module):
 
         self.__dict__.update(locals())  # assign all variables to self
 
-    def forward(self, im, augment=False, visualize=False, meanfeature=False):
+    def forward(self, im, augment=False, visualize=False, meanfeature=False, extract=False, target=0):
         # YOLOv5 MultiBackend inference
         b, ch, h, w = im.shape  # batch, channel, height, width
         if self.fp16 and im.dtype != torch.float16:
@@ -1433,7 +1433,8 @@ class DetectMultiBackend_meanfeature(nn.Module):
             im = im.permute(0, 2, 3, 1)  # torch BCHW to numpy BHWC shape(1,320,192,3)
 
         if self.pt:  # PyTorch
-            y = self.model(im, augment=augment, visualize=visualize, meanfeature=meanfeature) if augment or visualize or meanfeature else self.model(im)
+            y, mappa = self.model(im, augment=augment, visualize=visualize, meanfeature=meanfeature,
+                                extract=extract, target=target) if augment or visualize or meanfeature or extract else self.model(im)
         elif self.jit:  # TorchScript
             y = self.model(im)
         elif self.dnn:  # ONNX OpenCV DNN
@@ -1501,10 +1502,21 @@ class DetectMultiBackend_meanfeature(nn.Module):
             y = [x if isinstance(x, np.ndarray) else x.numpy() for x in y]
             y[0][..., :4] *= [w, h, w, h]  # xywh normalized to pixels
 
-        if isinstance(y, (list, tuple)):
-            return self.from_numpy(y[0]) if len(y) == 1 else [self.from_numpy(x) for x in y]
+        if not extract:
+            if isinstance(y, (list, tuple)):
+                return self.from_numpy(y[0]) if len(y) == 1 else [self.from_numpy(x) for x in y]
+            else:
+                return self.from_numpy(y)
         else:
-            return self.from_numpy(y)
+
+            if isinstance(y, (list, tuple)):
+                if len(y)==1:
+                    print('1')
+                    return self.from_numpy(y[0]), mappa
+                else:
+                    return ([self.from_numpy(x) for x in y], mappa)
+            else:
+                return self.from_numpy(y), mappa
 
     def from_numpy(self, x):
         return torch.from_numpy(x).to(self.device) if isinstance(x, np.ndarray) else x

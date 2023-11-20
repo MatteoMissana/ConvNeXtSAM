@@ -1140,3 +1140,46 @@ if Path(inspect.stack()[0].filename).parent.parent.as_posix() in inspect.stack()
     cv2.imread, cv2.imwrite, cv2.imshow = imread, imwrite, imshow  # redefine
 
 # Variables ------------------------------------------------------------------------------------------------------------
+
+def find_max_value_coordinates(matrix):
+    # Find the index of the maximum value in the matrix
+    max_index = np.argmax(matrix)
+
+    # Convert the index to the coordinates of the matrix
+    coordinates = np.unravel_index(max_index, matrix.shape)
+
+    return coordinates
+
+def find_max_pixel(tensor, start_row, end_row, start_col, end_col):
+    """
+    Find the maximum pixel value within a specified sub-rectangle of a 2D PyTorch tensor.
+
+    Parameters:
+    - tensor (torch.Tensor): Input 2D tensor.
+    - start_row, end_row (int): Coordinates specifying the range of rows (inclusive).
+    - start_col, end_col (int): Coordinates specifying the range of columns (inclusive).
+
+    Returns:
+    - max_pixel_value (torch.Tensor): Maximum pixel value in the specified sub-rectangle.
+    - max_pixel_coordinates (tuple): Coordinates of the maximum pixel in the format (row, column).
+    """
+
+    # Extract the sub-rectangle from the tensor
+    sub_tensor = tensor[start_row:end_row+1, start_col:end_col+1]
+
+    if sub_tensor.numel() == 0:
+        # If the sub-rectangle is empty, return None values
+        return None, None
+
+    # Find the index of the maximum value in the sub-rectangle
+    max_index = torch.argmax(sub_tensor)
+
+    # Convert the flattened index to 2D coordinates
+    max_pixel_coordinates = (max_index // sub_tensor.shape[1], max_index % sub_tensor.shape[1])
+    max_pix_coordinates = ((start_row + max_pixel_coordinates[0]).item(), (start_col + max_pixel_coordinates[1]).item())
+
+    # Get the maximum pixel value
+    max_pixel_value = sub_tensor[max_pixel_coordinates[0], max_pixel_coordinates[1]].item()
+
+    return max_pixel_value, max_pix_coordinates
+
