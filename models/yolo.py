@@ -131,9 +131,6 @@ class BaseModel(nn.Module):
             elif visualize:
                 feature_visualization(x, m.type, m.i, save_dir=visualize)
 
-        # if isinstance(features, list):
-        #     print(len(maps),maps[0].shape)
-        #     features = [np.mean(layers.numpy(), axis=0) for layers in maps]
         if isinstance(features, list):
             features.append(maps)
 

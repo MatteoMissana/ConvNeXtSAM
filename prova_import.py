@@ -50,12 +50,16 @@ out = model(img)  # out è un oggetto Detections dichiarato in common.py righa 1
 # out.crop(save_dir='runs/detect/exp') ti salva i crop delle sole bbox
 # guarda dove lo dichiara per altri metodi che non ho esplorato...
 
-# out.save()
+# out.pred da fuori le coordinate
+# out.heat_maps da fuori le heatmap mediate delle teste
+
+
 pred = out.heat_maps
 # pred == list(tensor(x_up_left, y_up_left, width, height, conf, class); len(pred) == num_imgs; tensor.size() == (n_preds,6)
 
 
 
+# sta roba è il modo più comodo che ho trovato per farle a colori...
 cm = plt.get_cmap('jet')
 
 for i in range(3):
