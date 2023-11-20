@@ -111,8 +111,9 @@ class BaseModel(nn.Module):
     def forward(self, x, profile=False, visualize=False, meanfeature=False):
         return self._forward_once(x, profile, visualize, meanfeature)  # single-scale inference, train
 
-    def _forward_once(self, x, profile=False, visualize=False, meanfeature=False):
+    def _forward_once(self, x, profile=False, visualize=False, meanfeature=False, features = None, last_layers = None):
         y, dt = [], []  # outputs
+        maps = []
         for m in self.model:
             if m.f != -1:  # if not from previous layer
                 x = y[m.f] if isinstance(m.f, int) else [x if j == -1 else y[j] for j in m.f]  # from earlier layers
@@ -120,10 +121,22 @@ class BaseModel(nn.Module):
                 self._profile_one_layer(m, x, dt)
             x = m(x)  # run
             y.append(x if m.i in self.save else None)  # save output
+
+            if isinstance(features, list):
+                if int(m.i) in last_layers:
+                    maps.append(np.mean(x.squeeze().numpy(),axis=0))
+
             if visualize and meanfeature:
                 feature_visualization_meanmaps(x, m.type, m.i, save_dir=visualize)
             elif visualize:
                 feature_visualization(x, m.type, m.i, save_dir=visualize)
+
+        # if isinstance(features, list):
+        #     print(len(maps),maps[0].shape)
+        #     features = [np.mean(layers.numpy(), axis=0) for layers in maps]
+        if isinstance(features, list):
+            features.append(maps)
+
         return x
 
     def _profile_one_layer(self, m, x, dt):
@@ -169,6 +182,8 @@ class DetectionModel(BaseModel):
     # YOLOv5 detection model
     def __init__(self, cfg='yolov5s.yaml', ch=3, nc=None, anchors=None):  # model, input channels, number of classes
         super().__init__()
+        self.heat_maps = []   #fra
+        self.last_layers = []
         if isinstance(cfg, dict):
             self.yaml = cfg  # model dict
         else:  # is *.yaml
@@ -185,7 +200,7 @@ class DetectionModel(BaseModel):
         if anchors:
             LOGGER.info(f'Overriding model.yaml anchors with anchors={anchors}')
             self.yaml['anchors'] = round(anchors)  # override yaml value
-        self.model, self.save = parse_model(deepcopy(self.yaml), ch=[ch])  # model, savelist
+        self.model, self.save, self.last_layers = parse_model(deepcopy(self.yaml), ch=[ch])  # model, savelist
         self.names = [str(i) for i in range(self.yaml['nc'])]  # default names
         self.inplace = self.yaml.get('inplace', True)
 
@@ -206,19 +221,35 @@ class DetectionModel(BaseModel):
         self.info()
         LOGGER.info('')
 
-    def forward(self, x, augment=False, profile=False, visualize=False, meanfeature=False):
-        if augment:
-            return self._forward_augment(x)  # augmented inference, None
-        return self._forward_once(x, profile, visualize, meanfeature)  # single-scale inference, train
+    def forward(self, x, augment=False, profile=False, visualize=False, meanfeature=False, save_features = False,
+                ext_heat = None, ext_last_layers = None):
 
-    def _forward_augment(self, x):
+        if not hasattr(self, 'heat_maps'):
+            heat = ext_heat
+            layers = ext_last_layers
+        else:
+            heat = self.heat_maps
+            layers = self.last_layers
+
+        if save_features:
+            if augment:
+                return self._forward_augment(x, features=heat, last_layers=layers)  # augmented inference, None
+            return self._forward_once(x, profile, visualize, meanfeature, features=heat, last_layers=layers)  # single-scale inference, train
+        else:
+            if augment:
+                return self._forward_augment(x)  # augmented inference, None
+            return self._forward_once(x, profile, visualize, meanfeature)  # single-scale inference, train
+    def _forward_augment(self, x, features=None, last_layers = None):
         img_size = x.shape[-2:]  # height, width
         s = [1, 0.83, 0.67]  # scales
         f = [None, 3, None]  # flips (2-ud, 3-lr)
         y = []  # outputs
         for si, fi in zip(s, f):
             xi = scale_img(x.flip(fi) if fi else x, si, gs=int(self.stride.max()))
-            yi = self._forward_once(xi)[0]  # forward
+            if isinstance(features, list):
+                yi = self._forward_once(xi, features=features, last_layers=last_layers)[0]  # forward
+            else:
+                yi = self._forward_once(xi)[0]
             # cv2.imwrite(f'img_{si}.jpg', 255 * xi[0].cpu().numpy().transpose((1, 2, 0))[:, :, ::-1])  # save
             yi = self._descale_pred(yi, fi, si, img_size)
             y.append(yi)
@@ -300,6 +331,8 @@ class ClassificationModel(BaseModel):
 
 #questo è quello da cambiare
 def parse_model(d, ch):  # model_dict, input_channels(3)
+
+    last_layers = None
     # Parse a YOLOv5 model.yaml dictionary
     LOGGER.info(f"\n{'':>3}{'from':>18}{'n':>3}{'params':>10}  {'module':<40}{'arguments':<30}")
     anchors, nc, gd, gw, act = d['anchors'], d['nc'], d['depth_multiple'], d['width_multiple'], d.get('activation')
@@ -351,6 +384,7 @@ def parse_model(d, ch):  # model_dict, input_channels(3)
             c2 = sum(ch[x] for x in f)
         # TODO: channel, gw, gd
         elif m in {Detect, Segment}:
+            last_layers = f
             args.append([ch[x] for x in f])
             if isinstance(args[1], int):  # number of anchors
                 args[1] = [list(range(args[1] * 2))] * len(f)
@@ -373,7 +407,7 @@ def parse_model(d, ch):  # model_dict, input_channels(3)
         if i == 0:
             ch = []
         ch.append(c2)
-    return nn.Sequential(*layers), sorted(save)
+    return nn.Sequential(*layers), sorted(save), last_layers
 
 
 if __name__ == '__main__':

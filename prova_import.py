@@ -2,6 +2,11 @@ import torch
 # from utils.general import non_max_suppression
 import cv2 as cv
 from matplotlib import  pyplot as plt
+from matplotlib import colormaps as cm
+from matplotlib.cm import ScalarMappable
+import numpy as np
+from PIL import Image
+
 
 #-----------------------------------------------------------------------------------------------------------------------
 #------------------------------     IMPORTANTE    ----------------------------------------------------------------------
@@ -25,7 +30,7 @@ def draw_bbox(preds, img):
     return img
 
 
-model = torch.hub.load('MatteoMissana/ConvNeXtSAM', 'custom', 'ConvNext.pt', trust_repo=True)
+model = torch.hub.load('', 'custom', 'ConvNext.pt',source='local')
 
 
 
@@ -33,10 +38,9 @@ model = torch.hub.load('MatteoMissana/ConvNeXtSAM', 'custom', 'ConvNext.pt', tru
 # torch.save(model, 'your_path/complete_model.pth')
 
 
-# print(model)
-# summary(model, (3, 640, 640))
 
-img = plt.imread('dataset/micro/images/test/image_000002_png.rf.a9ecda8477278f9747c4d47ffb8038bb.jpg')
+img = cv.imread('dataset/micro/images/test/image_000003_png.rf.c57270494b2f08b77196e026070d2097.jpg')
+img= cv.cvtColor(img, cv.COLOR_BGR2RGB)
 
 out = model(img)  # out è un oggetto Detections dichiarato in common.py righa 1950
 
@@ -47,21 +51,18 @@ out = model(img)  # out è un oggetto Detections dichiarato in common.py righa 1
 # guarda dove lo dichiara per altri metodi che non ho esplorato...
 
 # out.save()
-pred = out.pred
+pred = out.heat_maps
 # pred == list(tensor(x_up_left, y_up_left, width, height, conf, class); len(pred) == num_imgs; tensor.size() == (n_preds,6)
 
 
 
+cm = plt.get_cmap('jet')
 
-print(pred)
+for i in range(3):
+    pred[0][i][pred[0][i] < 0] = 0
 
-
-# out_img = draw_bbox(pred, img)
-#
-# fig, ax = plt.subplots()
-# ax.imshow(out_img)
-#
-# plt.savefig('runs/detect/exp/img.jpg')
-# plt.close()
-
+    my_img = cv.resize(pred[0][i], (img.shape[1], img.shape[0]), interpolation=cv.INTER_LINEAR)
+    norm = plt.Normalize(vmin=np.min(my_img), vmax=np.max(my_img))
+    colored_image = cm(norm(my_img))
+    Image.fromarray((colored_image[:, :, :3] * 255).astype(np.uint8)).save(f'runs/prova_reshp{i}.png')
 

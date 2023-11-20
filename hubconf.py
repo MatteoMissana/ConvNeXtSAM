@@ -57,8 +57,10 @@ def _create(name, pretrained=True, channels=3, classes=80, autoshape=True, verbo
                     else:
                         model = AutoShape(model)  # for file/URI/PIL/cv2/np inputs and NMS
             except Exception:
+                print('ECCEZIONEEEEE')
                 model = attempt_load(path, device=device, fuse=False)  # arbitrary model
         else:
+            print('ECCEZIONEEEEE 2')
             cfg = list((Path(__file__).parent / 'models').rglob(f'{path.stem}.yaml'))[0]  # model.yaml path
             model = DetectionModel(cfg, channels, classes)  # create model
             if pretrained:

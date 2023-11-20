@@ -1543,7 +1543,7 @@ class DetectMultiBackend_meanfeature(nn.Module):
 
 class DetectMultiBackend(nn.Module):
     # YOLOv5 MultiBackend class for python inference on various backends
-    def __init__(self, weights='yolov5s.pt', device=torch.device('cpu'), dnn=False, data=None, fp16=False, fuse=True):
+    def __init__(self, weights='yolov5s.pt', device=torch.device('cpu'), dnn=False, data=None, fp16=False, fuse=True, last_layers=[26,30,34]):
         # Usage:
         #   PyTorch:              weights = *.pt
         #   TorchScript:                    *.torchscript
@@ -1575,6 +1575,14 @@ class DetectMultiBackend(nn.Module):
             names = model.module.names if hasattr(model, 'module') else model.names  # get class names
             model.half() if fp16 else model.float()
             self.model = model  # explicitly assign for to(), cpu(), cuda(), half()
+            if not hasattr(self.model, 'heat_maps'):
+                self.heat_maps=[]
+                self.last_layers = last_layers
+            else:
+                self.heat_maps=None
+                self.last_layers = None
+
+
         elif jit:  # TorchScript
             LOGGER.info(f'Loading {w} for TorchScript inference...')
             extra_files = {'config.txt': ''}  # model metadata
@@ -1731,7 +1739,7 @@ class DetectMultiBackend(nn.Module):
 
         self.__dict__.update(locals())  # assign all variables to self
 
-    def forward(self, im, augment=False, visualize=False):
+    def forward(self, im, augment=False, visualize=False, save_features=False):
         # YOLOv5 MultiBackend inference
         b, ch, h, w = im.shape  # batch, channel, height, width
         if self.fp16 and im.dtype != torch.float16:
@@ -1740,7 +1748,18 @@ class DetectMultiBackend(nn.Module):
             im = im.permute(0, 2, 3, 1)  # torch BCHW to numpy BHWC shape(1,320,192,3)
 
         if self.pt:  # PyTorch
-            y = self.model(im, augment=augment, visualize=visualize) if augment or visualize else self.model(im)
+            if augment or visualize:
+                if save_features:
+                    y = self.model(im, augment=augment, visualize=visualize, save_features=save_features,
+                                   ext_heat=self.heat_maps, ext_last_layers=self.last_layers)
+                else:
+                    y = self.model(im, augment=augment, visualize=visualize)
+            else:
+                if save_features:
+                    y = self.model(im, save_features=save_features,  ext_heat=self.heat_maps,
+                                   ext_last_layers=self.last_layers)
+                else:
+                    y = self.model(im)
         elif self.jit:  # TorchScript
             y = self.model(im)
         elif self.dnn:  # ONNX OpenCV DNN
@@ -1929,8 +1948,9 @@ class AutoShape(nn.Module):
 
         with amp.autocast(autocast):
             # Inference
-            with dt[1]:
-                y = self.model(x, augment=augment)  # forward
+            with dt[1]:    #forse modifica qua
+                #y = self.model(x, augment=augment)  # forward
+                y = self.model(x, augment=augment, save_features = True)
 
             # Post-process
             with dt[2]:
@@ -1944,15 +1964,18 @@ class AutoShape(nn.Module):
                 for i in range(n):
                     scale_boxes(shape1, y[i][:, :4], shape0[i])
 
-            return Detections(ims, y, files, dt, self.names, x.shape)
+            return Detections(ims, y, files, dt, self.names, x.shape, self.model.heat_maps)
+            #return Detections(ims, y, files, dt, self.names, x.shape)
 
 
 class Detections:
     # YOLOv5 detections class for inference results
-    def __init__(self, ims, pred, files, times=(0, 0, 0), names=None, shape=None):
+    def __init__(self, ims, pred, files, times=(0, 0, 0), names=None, shape=None, heat_maps = None):
         super().__init__()
         d = pred[0].device  # device
         gn = [torch.tensor([*(im.shape[i] for i in [1, 0, 1, 0]), 1, 1], device=d) for im in ims]  # normalizations
+        if heat_maps:
+            self.heat_maps = heat_maps
         self.ims = ims  # list of images as numpy arrays
         self.pred = pred  # list of tensors pred[0] = (xyxy, conf, cls)
         self.names = names  # class names
