@@ -37,9 +37,9 @@ model = torch.hub.load('', 'custom', 'ConvNext.pt',source='local')
 # qui sotto ti metto come salvare il modello per esportarlo ed usarlo dove vuoi
 # torch.save(model, 'your_path/complete_model.pth')
 
+img_path = 'dataset/micro/images/test/image_000003_png.rf.c57270494b2f08b77196e026070d2097.jpg'
 
-
-img = cv.imread('dataset/micro/images/test/image_000003_png.rf.c57270494b2f08b77196e026070d2097.jpg')
+img = cv.imread(img_path)
 img= cv.cvtColor(img, cv.COLOR_BGR2RGB)
 
 out = model(img)  # out è un oggetto Detections dichiarato in common.py righa 1950
@@ -58,15 +58,22 @@ pred = out.heat_maps
 # pred == list(tensor(x_up_left, y_up_left, width, height, conf, class); len(pred) == num_imgs; tensor.size() == (n_preds,6)
 
 
+out.max_per_box()
+
 
 # sta roba è il modo più comodo che ho trovato per farle a colori...
-cm = plt.get_cmap('jet')
+# cm = plt.get_cmap('jet')
+#
+# for i in range(3):
+#     pred[0][i][pred[0][i] < 0] = 0
+#
+#     my_img = cv.resize(pred[0][i], (img.shape[1], img.shape[0]), interpolation=cv.INTER_LINEAR)
+#     norm = plt.Normalize(vmin=np.min(my_img), vmax=np.max(my_img))
+#     colored_image = cm(norm(my_img))
+#     Image.fromarray((colored_image[:, :, :3] * 255).astype(np.uint8)).save(f'runs/prova_reshp{i}.png')
 
-for i in range(3):
-    pred[0][i][pred[0][i] < 0] = 0
 
-    my_img = cv.resize(pred[0][i], (img.shape[1], img.shape[0]), interpolation=cv.INTER_LINEAR)
-    norm = plt.Normalize(vmin=np.min(my_img), vmax=np.max(my_img))
-    colored_image = cm(norm(my_img))
-    Image.fromarray((colored_image[:, :, :3] * 255).astype(np.uint8)).save(f'runs/prova_reshp{i}.png')
+
+
+
 

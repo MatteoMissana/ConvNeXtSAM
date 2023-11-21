@@ -2001,9 +2001,12 @@ class Detections:
         self.t = tuple(x.t / self.n * 1E3 for x in times)  # timestamps (ms)
         self.s = tuple(shape)  # inference BCHW shape
 
-    def _run(self, pprint=False, show=False, save=False, crop=False, render=False, labels=True, save_dir=Path('')):
+    def _run(self, pprint=False, show=False, save=False, crop=False, render=False, labels=True, save_dir=Path(''),
+             heat_map=False):
         s, crops = '', []
         for i, (im, pred) in enumerate(zip(self.ims, self.pred)):
+            j = 0
+            crop_box = []
             s += f'\nimage {i + 1}/{len(self.pred)}: {im.shape[0]}x{im.shape[1]} '  # string
             if pred.shape[0]:
                 for c in pred[:, -1].unique():
@@ -2013,8 +2016,9 @@ class Detections:
                 if show or save or render or crop:
                     annotator = Annotator(im, example=str(self.names))
                     for *box, conf, cls in reversed(pred):  # xyxy, confidence, class
+                        j+=1
                         label = f'{self.names[int(cls)]} {conf:.2f}'
-                        if crop:
+                        if crop and not heat_map:
                             file = save_dir / 'crops' / self.names[int(cls)] / self.files[i] if save else None
                             crops.append({
                                 'box': box,
@@ -2022,9 +2026,33 @@ class Detections:
                                 'cls': cls,
                                 'label': label,
                                 'im': save_one_box(box, im, file=file, save=save)})
+                        elif crop and heat_map:
+                            file = save_dir / 'crops' / self.names[int(cls)] / self.files[i] if save else None
+
+                            maps = self.heat_maps[i]
+                            for indx in range(len(maps)):
+                                maps[indx][maps[indx] < 0] = 0
+                                maps[indx] = cv2.resize(maps[indx], (im.shape[1], im.shape[0]), interpolation=cv2.INTER_LINEAR)
+                            crop_box.append({
+                                'name': f'box_{j}',
+                                'im': save_one_box(box, im, file=file, save=save),
+                                'box': box,
+                                'conf': conf,
+                                'cls': cls,
+                                'label': label,
+                                'l': save_one_box(box, maps[0], file=file, save=save, gray=True),
+                                'm': save_one_box(box, maps[1], file=file, save=save, gray=True),
+                                's': save_one_box(box, maps[2], file=file, save=save, gray=True)
+                            })
+
                         else:  # all others
                             annotator.box_label(box, label if labels else '', color=colors(cls))
                     im = annotator.im
+                    if crop and heat_map:
+                        crops.append({
+                            'name': f'img_{i}',
+                            'preds': crop_box
+                        })
             else:
                 s += '(no detections)'
 
@@ -2058,9 +2086,9 @@ class Detections:
         save_dir = increment_path(save_dir, exist_ok, mkdir=True)  # increment save_dir
         self._run(save=True, labels=labels, save_dir=save_dir)  # save results
 
-    def crop(self, save=True, save_dir='runs/detect/exp', exist_ok=False):
+    def crop(self, save=True, save_dir='runs/detect/exp', exist_ok=False, heat_map=False):
         save_dir = increment_path(save_dir, exist_ok, mkdir=True) if save else None
-        return self._run(crop=True, save=save, save_dir=save_dir)  # crop results
+        return self._run(crop=True, save=save, save_dir=save_dir, heat_map=heat_map)  # crop results
 
     def render(self, labels=True):
         self._run(render=True, labels=labels)  # render results
@@ -2085,6 +2113,21 @@ class Detections:
         #        setattr(d, k, getattr(d, k)[0])  # pop out of list
         return x
 
+    def max_per_box(self, save = False, save_path='runs/detect/exp', heat_map=True):
+        crops = self.crop(save=save, save_dir=save_path,heat_map=heat_map)
+        Areas = []
+        for imgs in crops:
+            for box in imgs['preds']:
+                max_l = np.unravel_index(box['l'].argmax(), box['l'].shape)
+                max_m = np.unravel_index(box['m'].argmax(), box['m'].shape)
+                max_s = np.unravel_index(box['s'].argmax(), box['s'].shape)
+
+                A_box = box['l'].shape[0]*box['l'].shape[1] # le crop hanno tutte stessa dim
+                # quest'area va rimpicciolita e usata per pesare la media dei 3 cazzi
+                # MAGARI funziona già solo uno scemo thresholding per sceglierne una alla volta
+                Areas.append(A_box)
+                print(max_l,max_m,max_s, A_box) # per ora SOLO nei crop (fare anche una media di sta roba)
+                # devo fare test per vedere la bbox di area massima e quella di area piccola
     def print(self):
         LOGGER.info(self.__str__())
 
