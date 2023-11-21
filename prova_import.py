@@ -1,3 +1,5 @@
+import os
+
 import torch
 # from utils.general import non_max_suppression
 import cv2 as cv
@@ -6,7 +8,7 @@ from matplotlib import colormaps as cm
 from matplotlib.cm import ScalarMappable
 import numpy as np
 from PIL import Image
-
+import requests
 
 #-----------------------------------------------------------------------------------------------------------------------
 #------------------------------     IMPORTANTE    ----------------------------------------------------------------------
@@ -14,6 +16,30 @@ from PIL import Image
 #
 # i pesi che vuoi usare devono essere nel main branch della tua repo locale ( NON VA AGGIUNTO A GIT PERCHE' PESA TROPPO)
 
+def exif_transpose(image):
+    """
+    Transpose a PIL image accordingly if it has an EXIF Orientation tag.
+    Inplace version of https://github.com/python-pillow/Pillow/blob/master/src/PIL/ImageOps.py exif_transpose()
+
+    :param image: The image to transpose.
+    :return: An image.
+    """
+    exif = image.getexif()
+    orientation = exif.get(0x0112, 1)  # default 1
+    if orientation > 1:
+        method = {
+            2: Image.FLIP_LEFT_RIGHT,
+            3: Image.ROTATE_180,
+            4: Image.FLIP_TOP_BOTTOM,
+            5: Image.TRANSPOSE,
+            6: Image.ROTATE_270,
+            7: Image.TRANSVERSE,
+            8: Image.ROTATE_90}.get(orientation)
+        if method is not None:
+            image = image.transpose(method)
+            del exif[0x0112]
+            image.info['exif'] = exif.tobytes()
+    return image
 
 
 def draw_bbox(preds, img):
@@ -40,9 +66,9 @@ model = torch.hub.load('', 'custom', 'ConvNext.pt',source='local')
 img_path = 'dataset/micro/images/test/image_000003_png.rf.c57270494b2f08b77196e026070d2097.jpg'
 
 img = cv.imread(img_path)
-img= cv.cvtColor(img, cv.COLOR_BGR2RGB)
+img = cv.cvtColor(img, cv.COLOR_BGR2RGB)
 
-out = model(img)  # out è un oggetto Detections dichiarato in common.py righa 1950
+out = model('dataset/micro/images/test')  # out è un oggetto Detections dichiarato in common.py righa 1950
 
 # si possono fare un sacco di cose simpatiche con questo oggetto...
 
@@ -58,19 +84,25 @@ pred = out.heat_maps
 # pred == list(tensor(x_up_left, y_up_left, width, height, conf, class); len(pred) == num_imgs; tensor.size() == (n_preds,6)
 
 
-out.max_per_box()
+cords = out.max_per_box(thresh=True)
 
+for i,im_path in enumerate(out.ims):
 
-# sta roba è il modo più comodo che ho trovato per farle a colori...
-# cm = plt.get_cmap('jet')
-#
-# for i in range(3):
-#     pred[0][i][pred[0][i] < 0] = 0
-#
-#     my_img = cv.resize(pred[0][i], (img.shape[1], img.shape[0]), interpolation=cv.INTER_LINEAR)
-#     norm = plt.Normalize(vmin=np.min(my_img), vmax=np.max(my_img))
-#     colored_image = cm(norm(my_img))
-#     Image.fromarray((colored_image[:, :, :3] * 255).astype(np.uint8)).save(f'runs/prova_reshp{i}.png')
+    name = im_path.split('\\')[-1]
+    im = Image.open(requests.get(im_path, stream=True).raw if str(im_path).startswith('http') else im_path)
+    im = np.asarray(exif_transpose(im))
+    im_copy = im.copy()
+    del im
+    f = 'runs/detect/centri_thresh_convnext'
+    if not os.path.isdir(f):
+        os.mkdir(f)
+
+    if cords[i]:   # per tenere conto delle immagini senza bbox da in output un lista vuota
+        for box in cords[i]:
+            im_copy[box[0]-10:box[0]+11, box[1]-10:box[1]+11, 0] = 255
+
+    Image.fromarray(im_copy).save(os.path.join(f,f'{name}'), quality=95, subsampling=0)
+
 
 
 

@@ -240,7 +240,7 @@ def save_difs_mean(path_dir_sam, path_dir_CneXt, path_save):
                                             sam = np.load(os.path.join(path_dir_sam, folder_sam, files_sam))
                                             Cnext = np.load(os.path.join(path_dir_CneXt, folder_Cnext, files_Cnext))
 
-                                            dif = sam - Cnext
+                                            dif = Cnext
 
                                             for i, map in enumerate(dif):
                                                 if i >= int(map_ckpt):

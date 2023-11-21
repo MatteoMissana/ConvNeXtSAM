@@ -2,7 +2,7 @@
 """
 Common modules
 """
-
+import os
 import ast
 import contextlib
 import json
@@ -1424,7 +1424,7 @@ class DetectMultiBackend_meanfeature(nn.Module):
 
         self.__dict__.update(locals())  # assign all variables to self
 
-    def forward(self, im, augment=False, visualize=False, meanfeature=False, extract=False, target=0):
+    def forward(self, im, augment=False, visualize=False, meanfeature=False, extract= False, target=0):
         # YOLOv5 MultiBackend inference
         b, ch, h, w = im.shape  # batch, channel, height, width
         if self.fp16 and im.dtype != torch.float16:
@@ -1433,8 +1433,7 @@ class DetectMultiBackend_meanfeature(nn.Module):
             im = im.permute(0, 2, 3, 1)  # torch BCHW to numpy BHWC shape(1,320,192,3)
 
         if self.pt:  # PyTorch
-            y, mappa = self.model(im, augment=augment, visualize=visualize, meanfeature=meanfeature,
-                                extract=extract, target=target) if augment or visualize or meanfeature or extract else self.model(im)
+            y = self.model(im, augment=augment, visualize=visualize, meanfeature=meanfeature) if augment or visualize or meanfeature else self.model(im)
         elif self.jit:  # TorchScript
             y = self.model(im)
         elif self.dnn:  # ONNX OpenCV DNN
@@ -1512,11 +1511,11 @@ class DetectMultiBackend_meanfeature(nn.Module):
             if isinstance(y, (list, tuple)):
                 if len(y)==1:
                     print('1')
-                    return self.from_numpy(y[0]), mappa
+                    return self.from_numpy(y[0])
                 else:
-                    return ([self.from_numpy(x) for x in y], mappa)
+                    return ([self.from_numpy(x) for x in y])
             else:
-                return self.from_numpy(y), mappa
+                return self.from_numpy(y)
 
     def from_numpy(self, x):
         return torch.from_numpy(x).to(self.device) if isinstance(x, np.ndarray) else x
@@ -1924,7 +1923,31 @@ class AutoShape(nn.Module):
         #   torch:           = torch.zeros(16,3,320,640)  # BCHW (scaled to size=640, 0-1 values)
         #   multiple:        = [Image.open('image1.jpg'), Image.open('image2.jpg'), ...]  # list of images
 
-        dt = (Profile(), Profile(), Profile())
+        if os.path.isdir(ims):
+            list_file = sorted(os.listdir(ims))
+            y = []
+            files = []
+            dt = (Profile(), Profile(), Profile())
+            shapes = []
+            img_dirs = []
+
+            for im in list_file:
+                print(f'reading {im}...')
+                det = self.run(os.path.join(ims, im), size=size, augment=augment, profile=profile, dt = dt)
+                img_dirs.append(os.path.join(ims, im))
+                y.append(det.pred[0])
+                files.append(im)
+                #dt = (dt[0]+det.times[0], dt[1]+det.times[1], dt[2]+det.times[2])
+                shapes.append(det.s)
+
+            return Detections(img_dirs,y,files,dt,self.names,shapes,self.model.heat_maps)
+        else:
+            return self.run(ims, size=size, augment=augment, profile=profile)
+
+    @smart_inference_mode()
+    def run(self, ims, size=640, augment=False, profile=False, dt = None):
+        if not dt:
+            dt = (Profile(), Profile(), Profile())
         with dt[0]:
             if isinstance(size, int):  # expand
                 size = (size, size)
@@ -1977,18 +2000,23 @@ class AutoShape(nn.Module):
                     scale_boxes(shape1, y[i][:, :4], shape0[i])
 
             return Detections(ims, y, files, dt, self.names, x.shape, self.model.heat_maps)
-            #return Detections(ims, y, files, dt, self.names, x.shape)
-
 
 class Detections:
     # YOLOv5 detections class for inference results
     def __init__(self, ims, pred, files, times=(0, 0, 0), names=None, shape=None, heat_maps = None):
         super().__init__()
         d = pred[0].device  # device
-        gn = [torch.tensor([*(im.shape[i] for i in [1, 0, 1, 0]), 1, 1], device=d) for im in ims]  # normalizations
+
+        if os.path.isfile(ims[0]): # o tutte o nessuna
+            for im_path in ims:
+                im = Image.open(requests.get(im_path, stream=True).raw if str(im_path).startswith('http') else im_path)
+                im = np.asarray(exif_transpose(im))
+                gn = [torch.tensor([*(im.shape[i] for i in [1, 0, 1, 0]), 1, 1], device=d)]  # normalizations
+        else:
+            gn = [torch.tensor([*(im.shape[i] for i in [1, 0, 1, 0]), 1, 1], device=d) for im in ims]  # normalizations
         if heat_maps:
-            self.heat_maps = heat_maps
-        self.ims = ims  # list of images as numpy arrays
+            self.heat_maps = heat_maps # list of heatmaps x picture (e.g. heat_maps[0] = [l,m,s])
+        self.ims = ims  # list of images as numpy arrays (o lista di path to images se gli passi una directory al modello)
         self.pred = pred  # list of tensors pred[0] = (xyxy, conf, cls)
         self.names = names  # class names
         self.files = files  # image filenames
@@ -2005,6 +2033,9 @@ class Detections:
              heat_map=False):
         s, crops = '', []
         for i, (im, pred) in enumerate(zip(self.ims, self.pred)):
+            if os.path.isfile(im):
+                im = Image.open(requests.get(im, stream=True).raw if str(im).startswith('http') else im)
+                im = np.asarray(exif_transpose(im))
             j = 0
             crop_box = []
             s += f'\nimage {i + 1}/{len(self.pred)}: {im.shape[0]}x{im.shape[1]} '  # string
@@ -2051,9 +2082,12 @@ class Detections:
                     if crop and heat_map:
                         crops.append({
                             'name': f'img_{i}',
+                            'shape': im.shape,
                             'preds': crop_box
                         })
             else:
+                if crop and heat_map:
+                    crops.append([])
                 s += '(no detections)'
 
             im = Image.fromarray(im.astype(np.uint8)) if isinstance(im, np.ndarray) else im  # from np
@@ -2113,24 +2147,75 @@ class Detections:
         #        setattr(d, k, getattr(d, k)[0])  # pop out of list
         return x
 
-    def max_per_box(self, save = False, save_path='runs/detect/exp', heat_map=True):
-        crops = self.crop(save=save, save_dir=save_path,heat_map=heat_map)
-        Areas = []
-        for imgs in crops:
-            for box in imgs['preds']:
-                max_l = np.unravel_index(box['l'].argmax(), box['l'].shape)
-                max_m = np.unravel_index(box['m'].argmax(), box['m'].shape)
-                max_s = np.unravel_index(box['s'].argmax(), box['s'].shape)
+    def max_per_box(self, save = False, save_path='runs/detect/exp', heat_map=True, thresh=False):
+        crops = self.crop(save=save, save_dir=save_path, heat_map=heat_map)
 
-                A_box = box['l'].shape[0]*box['l'].shape[1] # le crop hanno tutte stessa dim
-                # quest'area va rimpicciolita e usata per pesare la media dei 3 cazzi
-                # MAGARI funziona già solo uno scemo thresholding per sceglierne una alla volta
-                Areas.append(A_box)
-                print(max_l,max_m,max_s, A_box) # per ora SOLO nei crop (fare anche una media di sta roba)
-                # devo fare test per vedere la bbox di area massima e quella di area piccola
+        if thresh:
+            return self.thres(crops)
+
     def print(self):
         LOGGER.info(self.__str__())
 
+    def thres(self, crops):
+        d = (729335 - 5525)//3
+        th_min = 5525 + d
+        th_max = 729335 - d
+
+        img_coords = []
+
+        for imgs in crops:
+            coords = []
+            if imgs: # le immagini senza preds escono come lista vuota
+                img_name = imgs['name']
+                shape = imgs['shape']
+                A_img = shape[0]*shape[1]
+                for box in imgs['preds']:
+                    box_name = box['name']
+                    A_box = box['l'].shape[0] * box['l'].shape[1]
+                    x = int(box['box'][0].numpy())
+                    y = int(box['box'][1].numpy())
+                    if (A_box*1000)//A_img <= (th_min*1000)//A_img:
+                        print(f'{img_name}_{box_name} used large')
+                        coords.append(np.unravel_index(box['l'].argmax(), box['l'].shape))
+                    elif (A_box*1000)//A_img >= (th_max*1000)//A_img:
+                        print(f'{img_name}_{box_name} used small')
+                        coords.append(np.unravel_index(box['s'].argmax(), box['s'].shape))
+                    else:
+                        print(f'{img_name}_{box_name} used medium')
+                        coords.append(np.unravel_index(box['m'].argmax(), box['m'].shape))
+                    coords[-1] = (coords[-1][0] + y, coords[-1][1] + x)
+
+            img_coords.append(coords)
+
+        return img_coords
+
+
+    def get_statistics(self, crops):
+        Areas = []
+        var_x = []
+        var_y = []
+
+        for imgs in crops:
+            if imgs:
+                for box in imgs['preds']:
+                    max_l = np.unravel_index(box['l'].argmax(), box['l'].shape)
+                    max_m = np.unravel_index(box['m'].argmax(), box['m'].shape)
+                    max_s = np.unravel_index(box['s'].argmax(), box['s'].shape)
+
+                    A_box = box['l'].shape[0] * box['l'].shape[1]  # le crop hanno tutte stessa dim
+                    # quest'area va rimpicciolita e usata per pesare la media dei 3 cazzi
+                    # MAGARI funziona già solo uno scemo thresholding per sceglierne una alla volta
+                    Areas.append(A_box)
+                    var_x.append(np.sqrt(np.var([max_l[0], max_m[0], max_s[0]])))
+                    var_y.append(np.sqrt(np.var([max_l[1], max_m[1], max_s[1]])))
+
+        var_varx = (np.min(var_x), np.max(var_x), np.mean(var_x), np.sqrt(np.var(var_x)))
+        var_vary = (np.min(var_y), np.max(var_y), np.mean(var_y), np.sqrt(np.var(var_y)))
+        A = (np.min(Areas), np.max(Areas), np.mean(Areas), np.sqrt(np.var(Areas)))
+        print('formato (min: [], max: [], mean: [], var: []')
+        print('Area: {}'.format(A))
+        print('var_x: {}'.format(var_varx))
+        print('var_y: {}'.format(var_vary))
     def __len__(self):  # override len(results)
         return self.n
 

@@ -583,9 +583,9 @@ def save_one_box(xyxy, im, file=Path('im.jpg'), gain=1.02, pad=10, square=False,
         if gray:
             cm = plt.get_cmap('jet')
             norm = plt.Normalize(vmin=np.min(crop), vmax=np.max(crop))
-            crop = cm(norm(crop))
-            crop = (crop[:, :, :3] * 255).astype(np.uint8)
-            crop=crop[:,:,::-1]
-
-        Image.fromarray(crop[..., ::-1]).save(f, quality=95, subsampling=0)  # save RGB
+            crop_save = cm(norm(crop))
+            crop_save = (crop_save[:, :, :3] * 255).astype(np.uint8)
+            Image.fromarray(crop_save).save(f, quality=95, subsampling=0)  # save RGB
+        else:
+            Image.fromarray(crop[..., ::-1]).save(f, quality=95, subsampling=0)  # save RGB
     return crop
