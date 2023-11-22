@@ -8,7 +8,44 @@ to do an inference on external data:
 detect.py --weights (insert here the weights of your model) --source (your image or dataset path)
 ```
 
-to evaluate your model:
+You can also extract more informations from your detections by doing this:
+```
+model = torch.hub.load('', 'custom', 'INSERT HERE THE MODEL WEIGHTS', source='local')
+
+img_path = 'INSERT HERE THE PATH TO YOUR IMAGES'
+
+out = model(img_path)
+```
+In this case out is an object with various methods:
+```
+out.save(save_dir='runs/detect/exp') 
+```
+saves the images with respective bounding box in save_dir
+```
+# out.crop(save_dir='runs/detect/exp') 
+```
+only saves the crops of your images that are contained in the bounding boxes.
+In order to get your predictions do:
+```
+preds = out.pred 
+```
+and to retrieve the mean heatmaps that are fed to the prediction heads:
+```
+out.heat_maps
+```
+
+If instead you want to have an idea of the most activated pixel based from these heatmaps:
+```
+draw_maxpoint(out, savepath='your path (default runs/maxpixel/exp)' thresh=True, medie=True)
+```
+with this function you will save your images with some dots that represent
+the most activated pixel. Dots will be green, red and blue. Green one
+is derived with a threshold method that derives the pixel from a determined 
+heatmap based on the dimension of the bounding box. The blue one is instead 
+derived from a heatmap obtained as a weighted mean of the 3 heatmaps, based
+on bounding box size. Red one is the center of the bounding box.
+
+To evaluate your model:
 ```
 python val.py --weights (insert here the weights of your model) --data (insert the name of the yaml file codifying your dataset) 
 ```

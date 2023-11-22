@@ -1,0 +1,59 @@
+import os
+import torch
+import cv2 as cv
+import numpy as np
+from PIL import Image
+import requests
+from utils.dataloaders import exif_transpose
+from utils.general import increment_path
+
+def draw_bbox(pred, img):
+    #given image and prediction list returns annotated image
+    for bbox in pred:
+        obj_class = int(bbox[-1])
+        conf = float(bbox[-2])
+
+        p1 = (int(bbox[0]),int(bbox[1]))
+        p2 = (int(bbox[2]),int(bbox[3]))
+
+        img = cv.rectangle(img, p1, p2, (255, 0, 0), thickness=2)
+        centro=[(int(bbox[1])+int(bbox[3]))//2, (int(bbox[0])+int(bbox[2]))//2]
+        img[centro[0] - 10:centro[0] + 11, centro[1] - 10:centro[1] + 11, :] = [255,0,0]
+    return img
+
+def draw_maxpoint(out, save_path='runs/maxpixel/exp', thresh=False, medie=False, exist_ok=False):
+    f = increment_path(save_path, exist_ok=exist_ok, mkdir=True)
+
+    if thresh:
+        coord_t = out.max_per_box(thresh=True)
+
+    if medie:
+        coord_m = out.max_per_box(medie=True)
+
+    preds = out.pred
+
+    for i, im_path in enumerate(out.ims):
+        name = im_path.split('\\')[-1]
+        im = Image.open(requests.get(im_path, stream=True).raw if str(im_path).startswith('http') else im_path)
+        im = np.asarray(exif_transpose(im))
+        im_copy = im.copy()
+        if preds[i].shape[0]:
+            im_copy = draw_bbox(pred=preds[i], img=im_copy)
+        del im
+
+        # draw rect on pixel extracted with threshold
+        if thresh:
+            if coord_t[i]:  # if not empty list
+                for box in coord_t[i]:
+                    im_copy[box[0] - 10:box[0] + 11, box[1] - 10:box[1] + 11, :] = [0, 255, 0]  # green
+
+        # draw rect on pixel extracted with weighted mean
+        if medie:
+            if coord_m[i]:  # if not empty list
+                for box in coord_m[i]:
+                    im_copy[box[0] - 10:box[0] + 11, box[1] - 10:box[1] + 11, :] = [0, 0, 255]  # blue
+
+        Image.fromarray(im_copy).save(os.path.join(f, f'{name}'), quality=95, subsampling=0)
+    print('results saved in {}'.format(f))
+    print('green rectangle stands for threshold method')
+    print('blue one for weighted mean')
