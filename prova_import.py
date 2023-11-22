@@ -56,19 +56,19 @@ def draw_bbox(preds, img):
     return img
 
 
-model = torch.hub.load('', 'custom', 'ConvNext.pt',source='local')
+model = torch.hub.load('', 'custom', r"C:\Users\User\OneDrive - Politecnico di Milano\matteo onedrive\OneDrive - Politecnico di Milano\model weights\ConvNeXtSAM_finetuning.pt", source='local')
 
 
 
 # qui sotto ti metto come salvare il modello per esportarlo ed usarlo dove vuoi
 # torch.save(model, 'your_path/complete_model.pth')
 
-img_path = 'dataset/micro/images/test/image_000003_png.rf.c57270494b2f08b77196e026070d2097.jpg'
+img_path = r"C:\Users\User\OneDrive - Politecnico di Milano\matteo onedrive\OneDrive - Politecnico di Milano\tesi_3ennale\dataset_MMI\images\test"
 
-img = cv.imread(img_path)
-img = cv.cvtColor(img, cv.COLOR_BGR2RGB)
+#img = cv.imread(img_path)
+#img = cv.cvtColor(img, cv.COLOR_BGR2RGB)
 
-out = model('dataset/micro/images/test')  # out è un oggetto Detections dichiarato in common.py righa 1950
+out = model(img_path)  # out è un oggetto Detections dichiarato in common.py righa 1950
 
 # si possono fare un sacco di cose simpatiche con questo oggetto...
 
@@ -84,7 +84,7 @@ pred = out.heat_maps
 # pred == list(tensor(x_up_left, y_up_left, width, height, conf, class); len(pred) == num_imgs; tensor.size() == (n_preds,6)
 
 
-cords = out.max_per_box(thresh=True)
+cords = out.max_per_box(medie=True)
 
 for i,im_path in enumerate(out.ims):
 
@@ -93,13 +93,15 @@ for i,im_path in enumerate(out.ims):
     im = np.asarray(exif_transpose(im))
     im_copy = im.copy()
     del im
-    f = 'runs/detect/centri_thresh_convnext'
+    f = 'runs/detect/centri_medie_convnextSAM_MMItest'
     if not os.path.isdir(f):
         os.mkdir(f)
 
     if cords[i]:   # per tenere conto delle immagini senza bbox da in output un lista vuota
         for box in cords[i]:
-            im_copy[box[0]-10:box[0]+11, box[1]-10:box[1]+11, 0] = 255
+            im_copy[box[0]-10:box[0]+11, box[1]-10:box[1]+11, 2] = 255
+            im_copy[box[0] - 10:box[0] + 11, box[1] - 10:box[1] + 11, 1] = 0
+            im_copy[box[0] - 10:box[0] + 11, box[1] - 10:box[1] + 11, 0] = 0
 
     Image.fromarray(im_copy).save(os.path.join(f,f'{name}'), quality=95, subsampling=0)
 

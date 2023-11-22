@@ -2147,14 +2147,44 @@ class Detections:
         #        setattr(d, k, getattr(d, k)[0])  # pop out of list
         return x
 
-    def max_per_box(self, save = False, save_path='runs/detect/exp', heat_map=True, thresh=False):
+    def max_per_box(self, save = False, save_path='runs/detect/exp', heat_map=True, thresh=False, medie=False):
         crops = self.crop(save=save, save_dir=save_path, heat_map=heat_map)
+        if medie:
+            return self.medie(crops)
 
         if thresh:
             return self.thres(crops)
 
     def print(self):
         LOGGER.info(self.__str__())
+
+    def medie(self, crops):
+        img_coords=[]
+        for imgs in crops:
+            coords = []
+            if imgs: # le immagini senza preds escono come lista vuota
+                img_name = imgs['name']
+                shape = imgs['shape']
+                A_img = shape[0]*shape[1]
+                for box in imgs['preds']:
+                    box_name = box['name']
+                    A_box = box['l'].shape[0] * box['l'].shape[1]
+                    x = int(box['box'][0].numpy())
+                    y = int(box['box'][1].numpy())
+                    ratio= A_box/A_img
+                    wl=max(0,259.7403*ratio**3-97.4026*ratio**2+4.1169*ratio+1)
+                    wm=-64*ratio**2+16*ratio
+                    ws=max(0,-259.7403*ratio**3+97.4026*ratio**2-4.1169*ratio)
+                    media= ((wl*box['l'] + wm*box['m'] + ws*box['s'])/(wm+wl+ws)) if ratio < .25 else box['s']
+
+                    coords.append(np.unravel_index(media.argmax(), media.shape))
+                    coords[-1] = (coords[-1][0] + y, coords[-1][1] + x)
+
+            img_coords.append(coords)
+
+        return img_coords
+
+
 
     def thres(self, crops):
         d = (729335 - 5525)//3
