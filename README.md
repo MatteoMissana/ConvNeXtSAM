@@ -41,9 +41,13 @@ draw_maxpoint(out, savepath='your path (default runs/maxpixel/exp)' thresh=True,
 with this function you will save your images with some dots that represent
 the most activated pixel. Dots will be green, red and blue. Green one
 is derived with a threshold method that derives the pixel from a determined 
-heatmap based on the dimension of the bounding box. The blue one is instead 
-derived from a heatmap obtained as a weighted mean of the 3 heatmaps, based
-on bounding box size. Red one is the center of the bounding box.
+heatmap based on the dimension of the bounding box. You can 
+utilize this method by setting the 'thresh' flag True.
+The blue one is instead derived from a heatmap obtained 
+as a weighted mean of the 3 heatmaps, based
+on bounding box size. To utilize this method set the
+'medie' flag True. Red one is the center of the bounding
+box.
 
 To evaluate your model:
 ```

@@ -53,7 +53,10 @@ def draw_maxpoint(out, save_path='runs/maxpixel/exp', thresh=False, medie=False,
                 for box in coord_m[i]:
                     im_copy[box[0] - 10:box[0] + 11, box[1] - 10:box[1] + 11, :] = [0, 0, 255]  # blue
 
+        # save image
         Image.fromarray(im_copy).save(os.path.join(f, f'{name}'), quality=95, subsampling=0)
+
+    # print results
     print('results saved in {}'.format(f))
     print('green rectangle stands for threshold method')
     print('blue one for weighted mean')
