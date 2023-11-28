@@ -25,7 +25,7 @@ from PIL import Image
 from torch.cuda import amp
 
 from utils import TryExcept
-from utils.dataloaders import exif_transpose, letterbox
+from utils.dataloaders import exif_transpose, letterbox, LoadImages
 from utils.general import (LOGGER, ROOT, Profile, check_requirements, check_suffix, check_version, colorstr,
                            increment_path, is_jupyter, make_divisible, non_max_suppression, scale_boxes, xywh2xyxy,
                            xyxy2xywh, yaml_load)
@@ -1923,6 +1923,8 @@ class AutoShape(nn.Module):
         #   torch:           = torch.zeros(16,3,320,640)  # BCHW (scaled to size=640, 0-1 values)
         #   multiple:        = [Image.open('image1.jpg'), Image.open('image2.jpg'), ...]  # list of images
 
+        VID_FORMATS = 'asf', 'avi', 'gif', 'm4v', 'mkv', 'mov', 'mp4', 'mpeg', 'mpg', 'ts', 'wmv'  # include video suffixes
+
         if os.path.isdir(ims):
             list_file = sorted(os.listdir(ims))
             y = []
@@ -1941,6 +1943,27 @@ class AutoShape(nn.Module):
                 shapes.append(det.s)
 
             return Detections(img_dirs,y,files,dt,self.names,shapes,self.model.heat_maps)
+        elif isinstance(ims,str) and Path(ims).suffix[1:] in VID_FORMATS:
+            if Path(ims).suffix[1:] in VID_FORMATS:
+                k = 0
+                y = []
+                dt = (Profile(), Profile(), Profile())
+                shapes = []
+                imgs = []
+                files = Path(ims).name
+                dataset = LoadImages(ims, img_size=None, stride=self.model.stride, auto=self.model.pt, vid_stride=1)
+                cap = cv2.VideoCapture(ims)
+                for _, im, _, _, _ in dataset:
+                    k+=1
+                    print(f'looking at frame{k}')
+                    det = self.run(im, size=size, augment=augment, profile=profile, dt=dt)
+                    imgs.append(det.ims[0])
+                    y.append(det.pred[0])
+                    # dt = (dt[0]+det.times[0], dt[1]+det.times[1], dt[2]+det.times[2])
+                    shapes.append(det.s)
+
+                return Detections(imgs, y, files, dt, self.names, shapes, self.model.heat_maps, is_video=True, cap=cap )
+
         else:
             return self.run(ims, size=size, augment=augment, profile=profile)
 
@@ -2003,10 +2026,11 @@ class AutoShape(nn.Module):
 
 class Detections:
     # YOLOv5 detections class for inference results
-    def __init__(self, ims, pred, files, times=(0, 0, 0), names=None, shape=None, heat_maps = None):
+    def __init__(self, ims, pred, files, times=(0, 0, 0), names=None, shape=None, heat_maps = None, is_video=None, cap = None):
         super().__init__()
         d = pred[0].device  # device
-
+        self.is_video=is_video
+        self.vid_cap = cap
         if os.path.isfile(ims[0]): # o tutte o nessuna
             for im_path in ims:
                 im = Image.open(requests.get(im_path, stream=True).raw if str(im_path).startswith('http') else im_path)
@@ -2030,8 +2054,19 @@ class Detections:
         self.s = tuple(shape)  # inference BCHW shape
 
     def _run(self, pprint=False, show=False, save=False, crop=False, render=False, labels=True, save_dir=Path(''),
-             heat_map=False):
+             heat_map=False, save_frames=False):
         s, crops = '', []
+
+        if save and self.is_video:
+            save_path = save_dir / self.files
+            save_path=str(Path(save_path).with_suffix('.mp4')) # forcing mp4 extension
+            fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+            fps = self.vid_cap.get(cv2.CAP_PROP_FPS)
+            w = int(self.vid_cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+            h = int(self.vid_cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+            print(fps,w,h)
+            video_writer = cv2.VideoWriter(str(save_path), fourcc, fps, (w, h))
+
         for i, (im, pred) in enumerate(zip(self.ims, self.pred)):
             if os.path.isfile(im):
                 im = Image.open(requests.get(im, stream=True).raw if str(im).startswith('http') else im)
@@ -2089,15 +2124,25 @@ class Detections:
                 if crop and heat_map:
                     crops.append([])
                 s += '(no detections)'
-
+            if save and self.is_video:
+                im_v = im.transpose(1, 0, 2).astype(np.uint8)
+                print(im_v.shape)
+                video_writer.write(im_v)
+                if i == self.n - 1:
+                    LOGGER.info(f"Saved video to {colorstr('bold', save_dir)}")
             im = Image.fromarray(im.astype(np.uint8)) if isinstance(im, np.ndarray) else im  # from np
+            if save and self.is_video and save_frames:
+                f = f'frame{i}.jpg'
+                if not os.path.isdir(save_dir / 'frames'):
+                    os.mkdir(save_dir / 'frames')
+                im.save(save_dir / 'frames' / f)  # save
             if show:
                 if is_jupyter():
                     from IPython.display import display
                     display(im)
                 else:
                     im.show(self.files[i])
-            if save:
+            if save and not self.is_video:
                 f = self.files[i]
                 im.save(save_dir / f)  # save
                 if i == self.n - 1:
@@ -2111,14 +2156,15 @@ class Detections:
             if save:
                 LOGGER.info(f'Saved results to {save_dir}\n')
             return crops
-
+        if save and self.is_video:
+            video_writer.release()
     @TryExcept('Showing images is not supported in this environment')
     def show(self, labels=True):
         self._run(show=True, labels=labels)  # show results
 
-    def save(self, labels=True, save_dir='runs/detect/exp', exist_ok=False):
+    def save(self, labels=True, save_dir='runs/detect/exp', exist_ok=False, save_frames=False):
         save_dir = increment_path(save_dir, exist_ok, mkdir=True)  # increment save_dir
-        self._run(save=True, labels=labels, save_dir=save_dir)  # save results
+        self._run(save=True, labels=labels, save_dir=save_dir, save_frames=save_frames)  # save results
 
     def crop(self, save=True, save_dir='runs/detect/exp', exist_ok=False, heat_map=False):
         save_dir = increment_path(save_dir, exist_ok, mkdir=True) if save else None

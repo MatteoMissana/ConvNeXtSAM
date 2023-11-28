@@ -42,34 +42,42 @@ def exif_transpose(image):
     return image
 
 
-def draw_bbox(preds, img):
-    for pred in preds:
-        for bbox in pred:
-            obj_class = int(bbox[-1])
-            conf = float(bbox[-2])
+def draw_bbox(pred, img):
+    for bbox in pred:
+        obj_class = int(bbox[-1])
+        conf = "{:.{}f}".format(float(bbox[-2]), 2)
 
-            p1 = (int(bbox[0]),int(bbox[1]))
-            p2 = (int(bbox[2]),int(bbox[3]))
+        p1 = (int(bbox[0]),int(bbox[1]))
+        p2 = (int(bbox[2]),int(bbox[3]))
 
-            img = cv.rectangle(img, p1, p2, (255, 0, 0), thickness=2)
+        c = ((int(bbox[0])+int(bbox[2]))//2,(int(bbox[1])+int(bbox[3]))//2)
+
+        img = cv.rectangle(img, p1, p2, (255, 0, 0), thickness=2)
+        img[c[1]-10:c[1]+11,c[0]-10:c[0]+11,:] = [255,0,0]
+
+        font = cv.FONT_HERSHEY_SIMPLEX
+        font_scale = 1
+        font_thickness = 3
+        text_size = cv.getTextSize(conf, font, font_scale, font_thickness)[0]
+        text_position = (int(int(bbox[0]) + (int(bbox[2])-int(bbox[0]) - text_size[0]) / 2), int(int(bbox[1]) - 5))
+
+        cv.putText(img, conf, text_position, font, font_scale, (255, 0, 0), font_thickness, cv.LINE_AA)
 
     return img
-
-
-model = torch.hub.load('', 'custom', r"C:\Users\User\OneDrive - Politecnico di Milano\matteo onedrive\OneDrive - Politecnico di Milano\model weights\ConvNeXtSAM_finetuning.pt", source='local')
 
 
 
 # qui sotto ti metto come salvare il modello per esportarlo ed usarlo dove vuoi
 # torch.save(model, 'your_path/complete_model.pth')
 
-img_path = r"C:\Users\User\OneDrive - Politecnico di Milano\matteo onedrive\OneDrive - Politecnico di Milano\tesi_3ennale\dataset_MMI\images\test"
+# img_path = 'dataset/micro/images/test/image_000001_png.rf.581bf4b408683cfe08dca8b231c0fd29.jpg'
+# img = cv.imread(img_path)
+# img = cv.cvtColor(img, cv.COLOR_BGR2RGB)
+model = torch.hub.load('', 'custom', 'runs/train/Micro/ConvNeXTtSAM_pretrained_hyp_finetune_60epcs/weights/best.pt', source='local')
 
-#img = cv.imread(img_path)
-#img = cv.cvtColor(img, cv.COLOR_BGR2RGB)
+out = model('dataset/sample_002_2d_needle_manipulation 2.mp4')  # out è un oggetto Detections dichiarato in common.py righa 1950
 
-out = model(img_path)  # out è un oggetto Detections dichiarato in common.py righa 1950
-
+out.save(save_frames=True)
 # si possono fare un sacco di cose simpatiche con questo oggetto...
 
 # out.save(save_dir='runs/detect/exp') ti salva le immagini con la bbox sopra in save_dir (quello è il default)
@@ -81,33 +89,39 @@ out = model(img_path)  # out è un oggetto Detections dichiarato in common.py ri
 
 
 pred = out.heat_maps
-# pred == list(tensor(x_up_left, y_up_left, width, height, conf, class); len(pred) == num_imgs; tensor.size() == (n_preds,6)
 
+# pred == list(tensor(x_up_left, y_up_left, x_bot_right, y_bot_right, conf, class); len(pred) == num_imgs; tensor.size() == (n_preds,6)
 
-cords = out.max_per_box(medie=True)
-
-for i,im_path in enumerate(out.ims):
-
-    name = im_path.split('\\')[-1]
-    im = Image.open(requests.get(im_path, stream=True).raw if str(im_path).startswith('http') else im_path)
-    im = np.asarray(exif_transpose(im))
-    im_copy = im.copy()
-    del im
-    f = 'runs/detect/centri_medie_convnextSAM_MMItest'
-    if not os.path.isdir(f):
-        os.mkdir(f)
-
-    if cords[i]:   # per tenere conto delle immagini senza bbox da in output un lista vuota
-        for box in cords[i]:
-            im_copy[box[0]-10:box[0]+11, box[1]-10:box[1]+11, 2] = 255
-            im_copy[box[0] - 10:box[0] + 11, box[1] - 10:box[1] + 11, 1] = 0
-            im_copy[box[0] - 10:box[0] + 11, box[1] - 10:box[1] + 11, 0] = 0
-
-    Image.fromarray(im_copy).save(os.path.join(f,f'{name}'), quality=95, subsampling=0)
-
-
-
-
-
-
-
+#
+# cords = out.max_per_box(thresh=True)
+#
+# cords2 = out.max_per_box(medie=True)
+#
+# for i,im_path in enumerate(out.ims):
+#
+#     name = im_path.split('\\')[-1]
+#     im = Image.open(requests.get(im_path, stream=True).raw if str(im_path).startswith('http') else im_path)
+#     im = np.asarray(exif_transpose(im))
+#     im_copy = im.copy()
+#     del im
+#     f = 'runs/detect/SAM_only_s'
+#     if not os.path.isdir(f):
+#         os.mkdir(f)
+#
+#     if cords[i]:   # per tenere conto delle immagini senza bbox da in output un lista vuota
+#         for box in cords[i]:
+#             im_copy[box[0]-10:box[0]+11, box[1]-10:box[1]+11, :] = [0,0,255]
+#         for box2 in cords2[i]:
+#             im_copy[box2[0]-10:box2[0]+11, box2[1]-10:box2[1]+11, :] = [0, 255, 0]
+#
+#     if out.pred[i].shape[0]:
+#         im_copy = draw_bbox(out.pred[i], im_copy)
+#
+#     Image.fromarray(im_copy).save(os.path.join(f,f'{name}'), quality=95, subsampling=0)
+#
+#
+# #
+#
+#
+#
+#
