@@ -21,7 +21,8 @@ def draw_bbox(pred, img):
         img[centro[0] - 10:centro[0] + 11, centro[1] - 10:centro[1] + 11, :] = [255,0,0]
     return img
 
-def draw_maxpoint(out, save_path='runs/maxpixel/exp', thresh=False, medie=False, exist_ok=False):
+def draw_maxpoint(out, save_dir='runs/maxpixel', name='exp', thresh=False, medie=False, exist_ok=False):
+    save_path = os.path.join(save_dir,name)
     f = increment_path(save_path, exist_ok=exist_ok, mkdir=True)
 
     if thresh:
@@ -32,10 +33,13 @@ def draw_maxpoint(out, save_path='runs/maxpixel/exp', thresh=False, medie=False,
 
     preds = out.pred
 
-    for i, im_path in enumerate(out.ims):
-        name = im_path.split('\\')[-1]
-        im = Image.open(requests.get(im_path, stream=True).raw if str(im_path).startswith('http') else im_path)
-        im = np.asarray(exif_transpose(im))
+    for i, im in enumerate(out.ims):
+        if isinstance(im, str):
+            name = im.split('\\')[-1]
+            im = Image.open(requests.get(im, stream=True).raw if str(im).startswith('http') else im)
+            im = np.asarray(exif_transpose(im))
+        else:
+            name = f"image_{i}.jpg"
         im_copy = im.copy()
         if preds[i].shape[0]:
             im_copy = draw_bbox(pred=preds[i], img=im_copy)
